@@ -1,0 +1,441 @@
+using System;
+using System.IO;
+using System.Collections.Generic;
+
+namespace ConsoleApplication1
+{
+    class Program
+    {
+        static string folder = "data";
+        static string recordFile = "data/records.txt";
+        static string auditFile = "data/audit.txt";
+        static string reportFile = "data/report.txt";
+
+        static void Main(string[] args)
+        {
+            InitializeStorage();
+
+            string choice = "";
+
+            while (choice != "0")
+            {
+                Console.Clear();
+
+                Console.WriteLine("===== LIBRARY LOAN SYSTEM =====");
+                Console.WriteLine("[1] Add Record");
+                Console.WriteLine("[2] View Records");
+                Console.WriteLine("[3] Search Record");
+                Console.WriteLine("[4] Update Record");
+                Console.WriteLine("[5] Soft Delete");
+                Console.WriteLine("[6] Generate Report");
+                Console.WriteLine("[7] Hard Delete");
+                Console.WriteLine("[0] Exit");
+                Console.Write("Enter Choice: ");
+
+                choice = Console.ReadLine();
+
+                switch (choice)
+                {
+                    case "1":
+                        AddRecord();
+                        break;
+
+                    case "2":
+                        ViewRecords();
+                        break;
+
+                    case "3":
+                        SearchRecord();
+                        break;
+
+                    case "4":
+                        UpdateRecord();
+                        break;
+
+                    case "5":
+                        SoftDelete();
+                        break;
+
+                    case "6":
+                        GenerateReport();
+                        break;
+
+                    case "7":
+                        HardDelete();
+                        break;
+
+                    case "0":
+                        Console.WriteLine("Program Ended");
+                        break;
+
+                    default:
+                        Console.WriteLine("Invalid Choice");
+                        Pause();
+                        break;
+                }
+            }
+        }
+
+        static void InitializeStorage()
+        {
+            try
+            {
+                if (!Directory.Exists(folder))
+                {
+                    Directory.CreateDirectory(folder);
+                }
+
+                if (!File.Exists(recordFile))
+                {
+                    File.Create(recordFile).Close();
+                }
+
+                if (!File.Exists(auditFile))
+                {
+                    File.Create(auditFile).Close();
+                }
+
+                if (!File.Exists(reportFile))
+                {
+                    File.Create(reportFile).Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+        static void AddRecord()
+        {
+            Console.Clear();
+
+            try
+            {
+                Random r = new Random();
+                int id = r.Next(1000, 9999);
+
+                Console.Write("Borrower Name: ");
+                string borrower = Console.ReadLine();
+
+                Console.Write("Book Title: ");
+                string book = Console.ReadLine();
+
+                Console.Write("Borrow Date: ");
+                string borrowDate = Console.ReadLine();
+
+                Console.Write("Return Date: ");
+                string returnDate = Console.ReadLine();
+
+                if (borrower == "" || book == "")
+                {
+                    Console.WriteLine("Invalid Input");
+                    Pause();
+                    return;
+                }
+
+                string createdAt = DateTime.Now.ToString();
+                string updatedAt = DateTime.Now.ToString();
+
+                string isActive = "True";
+
+                string checksumText = borrower + book;
+                int checksum = GenerateChecksum(checksumText);
+
+                string record =
+                    id + "|" +
+                    borrower + "|" +
+                    book + "|" +
+                    borrowDate + "|" +
+                    returnDate + "|" +
+                    createdAt + "|" +
+                    updatedAt + "|" +
+                    isActive + "|" +
+                    checksum;
+
+                File.AppendAllText(recordFile, record + Environment.NewLine);
+
+                LogAction("ADD", "Added Record " + id);
+
+                Console.WriteLine("Record Added Successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                LogAction("ERROR", ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void ViewRecords()
+        {
+            Console.Clear();
+
+            try
+            {
+                string[] records = File.ReadAllLines(recordFile);
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data.Length >= 9)
+                    {
+                        if (data[7] == "True")
+                        {
+                            Console.WriteLine("Record ID: " + data[0]);
+                            Console.WriteLine("Borrower: " + data[1]);
+                            Console.WriteLine("Book: " + data[2]);
+                            Console.WriteLine("Borrow Date: " + data[3]);
+                            Console.WriteLine("Return Date: " + data[4]);
+                            Console.WriteLine("--------------------------------");
+                        }
+                    }
+                }
+
+                LogAction("READ", "Viewed Records");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void SearchRecord()
+        {
+            Console.Clear();
+
+            Console.Write("Search Borrower Name: ");
+            string search = Console.ReadLine().ToLower();
+
+            try
+            {
+                string[] records = File.ReadAllLines(recordFile);
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data.Length >= 9)
+                    {
+                        if (data[1].ToLower().Contains(search))
+                        {
+                            if (data[7] == "True")
+                            {
+                                Console.WriteLine("ID: " + data[0]);
+                                Console.WriteLine("Borrower: " + data[1]);
+                                Console.WriteLine("Book: " + data[2]);
+                                Console.WriteLine("----------------------");
+                            }
+                        }
+                    }
+                }
+
+                LogAction("READ", "Search Record");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void UpdateRecord()
+        {
+            Console.Clear();
+
+            Console.Write("Enter Record ID: ");
+            string id = Console.ReadLine();
+
+            try
+            {
+                List<string> newRecords = new List<string>();
+
+                string[] records = File.ReadAllLines(recordFile);
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data[0] == id)
+                    {
+                        Console.Write("New Borrower Name: ");
+                        data[1] = Console.ReadLine();
+
+                        Console.Write("New Book Title: ");
+                        data[2] = Console.ReadLine();
+
+                        data[6] = DateTime.Now.ToString();
+
+                        string checksumText = data[1] + data[2];
+                        data[8] = GenerateChecksum(checksumText).ToString();
+                    }
+
+                    newRecords.Add(string.Join("|", data));
+                }
+
+                File.WriteAllLines(recordFile, newRecords);
+
+                Console.WriteLine("Record Updated");
+                LogAction("UPDATE", "Updated Record " + id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void SoftDelete()
+        {
+            Console.Clear();
+
+            Console.Write("Enter Record ID: ");
+            string id = Console.ReadLine();
+
+            try
+            {
+                List<string> newRecords = new List<string>();
+
+                string[] records = File.ReadAllLines(recordFile);
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data[0] == id)
+                    {
+                        data[7] = "False";
+                    }
+
+                    newRecords.Add(string.Join("|", data));
+                }
+
+                File.WriteAllLines(recordFile, newRecords);
+
+                Console.WriteLine("Soft Delete Successful");
+                LogAction("DELETE", "Soft Deleted " + id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void HardDelete()
+        {
+            Console.Clear();
+
+            Console.Write("Enter Record ID: ");
+            string id = Console.ReadLine();
+
+            try
+            {
+                List<string> newRecords = new List<string>();
+
+                string[] records = File.ReadAllLines(recordFile);
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data[0] != id)
+                    {
+                        newRecords.Add(line);
+                    }
+                }
+
+                File.WriteAllLines(recordFile, newRecords);
+
+                Console.WriteLine("Hard Delete Successful");
+                LogAction("DELETE", "Hard Deleted " + id);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void GenerateReport()
+        {
+            Console.Clear();
+
+            try
+            {
+                string[] records = File.ReadAllLines(recordFile);
+
+                int total = 0;
+
+                foreach (string line in records)
+                {
+                    string[] data = line.Split('|');
+
+                    if (data.Length >= 9)
+                    {
+                        if (data[7] == "True")
+                        {
+                            total++;
+                        }
+                    }
+                }
+
+                string report =
+                    "===== REPORT =====" + Environment.NewLine +
+                    "Date: " + DateTime.Now + Environment.NewLine +
+                    "Total Active Loans: " + total;
+
+                File.WriteAllText(reportFile, report);
+
+                Console.WriteLine(report);
+
+                LogAction("REPORT", "Generated Report");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            Pause();
+        }
+
+        static void LogAction(string action, string details)
+        {
+            string log =
+                DateTime.Now +
+                " | " +
+                action +
+                " | " +
+                details;
+
+            File.AppendAllText(auditFile, log + Environment.NewLine);
+        }
+
+        static int GenerateChecksum(string text)
+        {
+            int sum = 0;
+
+            foreach (char c in text)
+            {
+                sum = sum + c;
+            }
+
+            return sum;
+        }
+
+        static void Pause()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press Any Key...");
+            Console.ReadKey();
+        }
+    }
+}
